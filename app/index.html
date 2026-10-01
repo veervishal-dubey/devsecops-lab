@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>DevSecOps Lab</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 3rem auto; }
+    .card { border: 1px solid #ccc; border-radius: 8px; padding: 1rem 1.5rem; margin: 1rem 0; }
+    code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; }
+    button { font-size: 1rem; padding: .5rem 1rem; cursor: pointer; }
+    .healthy { color: #157f3d; font-weight: bold; }
+    .UNHEALTHY { color: #b3261e; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>DevSecOps Lab</h1>
+
+  <div class="card">
+    <p>Served by container <code>__CONTAINER__</code></p>
+    <p>Health status: <span class="__STATUS__">__STATUS__</span></p>
+  </div>
+
+  <div class="card">
+    <p>Make this container fail its health check:</p>
+    <button onclick="fetch('/break').then(() => location.reload())">Break it</button>
+    <button onclick="fetch('/fix').then(() => location.reload())">Fix it</button>
+    <p><small>In Kubernetes, breaking it means the liveness probe fails and the pod is restarted.
+    Watch the RESTARTS column in <code>kubectl get pods</code>.</small></p>
+  </div>
+</body>
+</html>

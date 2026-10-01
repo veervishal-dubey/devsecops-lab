@@ -1,0 +1,15 @@
+{
+  "name": "devsecops-lab",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Unit 4 lab app. The dependencies below are PINNED TO OLD, VULNERABLE VERSIONS on purpose so that npm audit and Trivy have something real to find. Do not copy this file into a real project.",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "audit": "npm audit"
+  },
+  "dependencies": {
+    "minimist": "1.2.0",
+    "lodash": "4.17.15"
+  }
+}

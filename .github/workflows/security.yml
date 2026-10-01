@@ -1,0 +1,88 @@
+# Lab C — the security gate.
+#
+# This workflow scans the image BEFORE it is allowed to be published, and fails
+# the build if anything HIGH or CRITICAL is found. That failure is the "gate".
+
+name: Security
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------
+  # SCA - are the libraries we depend on known to be vulnerable?
+  # ---------------------------------------------------------------------
+  dependencies:
+    name: Dependency scan (SCA)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # npm audit needs a lock file. Generate one without installing anything.
+      - name: Resolve the dependency tree
+        working-directory: app
+        run: npm install --package-lock-only
+
+      # --audit-level=high means: only fail for high and critical advisories.
+      # Drop to --audit-level=critical if you want a looser gate.
+      - name: npm audit
+        working-directory: app
+        run: npm audit --audit-level=high
+
+  # ---------------------------------------------------------------------
+  # Container scan - is the image we are about to ship vulnerable?
+  # ---------------------------------------------------------------------
+  image:
+    name: Container scan (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image
+        run: docker build -t devsecops-lab:${{ github.sha }} ./app
+
+      # Report everything, so the log is useful even when the build passes.
+      - name: Trivy - full report
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: devsecops-lab:${{ github.sha }}
+          format: table
+          exit-code: '0'
+
+      # THE GATE. exit-code 1 fails the job when a HIGH or CRITICAL is found.
+      - name: Trivy - fail on HIGH or CRITICAL
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: devsecops-lab:${{ github.sha }}
+          format: table
+          severity: 'HIGH,CRITICAL'
+          ignore-unfixed: true      # don't block on CVEs that have no patch yet
+          exit-code: '1'
+
+  # ---------------------------------------------------------------------
+  # SAST - is OUR OWN code insecure? Runs on GitHub, no account needed.
+  # ---------------------------------------------------------------------
+  code:
+    name: Code scan (CodeQL)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+
+      - uses: github/codeql-action/analyze@v3

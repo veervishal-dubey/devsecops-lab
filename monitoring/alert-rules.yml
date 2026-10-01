@@ -1,0 +1,69 @@
+# Alert rules for the Unit 4 lab app.
+#
+# Read these next to k8s/deployment-probes.yaml. They are the same shape as a liveness probe:
+#   a condition, a period it must hold for, and something that happens when it does.
+#
+# The difference is what happens at the end:
+#   a probe       -> Kubernetes restarts the container, in seconds, silently
+#   an alert rule -> Alertmanager tells a human, who then has to decide what to do
+#
+# Prefer the probe wherever the fix is mechanical. Use an alert where judgement is required.
+
+groups:
+  - name: golden-signals
+    rules:
+      # --- ERRORS -----------------------------------------------------------
+      - alert: HighErrorRate
+        expr: |
+          100 * sum(rate(http_requests_total{status=~"5.."}[5m]))
+              / clamp_min(sum(rate(http_requests_total[5m])), 0.001) > 5
+        for: 2m # must stay true for 2 minutes, so one bad second does not page anyone
+        labels:
+          severity: critical
+        annotations:
+          summary: "More than 5% of requests are failing"
+          description: "Error rate has been above 5% for 2 minutes."
+
+      # --- LATENCY ----------------------------------------------------------
+      - alert: SlowResponses
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m]))) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "95th percentile latency is above 1 second"
+          description: "One request in twenty is taking longer than a second."
+
+      # --- SATURATION -------------------------------------------------------
+      - alert: EventLoopBlocked
+        expr: nodejs_eventloop_lag_seconds > 0.1
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node event loop is lagging on {{ $labels.pod }}"
+          description: "The process is busier than it can keep up with."
+
+      # --- AVAILABILITY -----------------------------------------------------
+      # Deliberately NOT paired with a page. The liveness probe already restarts the pod,
+      # so this exists only to notice that it keeps happening.
+      - alert: PodRestartingRepeatedly
+        expr: min(process_uptime_seconds) < 120
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "A pod has restarted several times in ten minutes"
+          description: "The probe is doing its job, but something keeps breaking. Check kubectl logs --previous."
+
+      # --- THE TARGET ITSELF ------------------------------------------------
+      # If Prometheus cannot scrape the app at all, every metric above simply stops existing
+      # and none of the rules fire. This is the one that catches that.
+      - alert: TargetDown
+        expr: up{job=~"devsecops-lab|kubernetes-pods"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus cannot reach {{ $labels.instance }}"
+          description: "No metrics are arriving. Absence of alerts is not evidence of health."

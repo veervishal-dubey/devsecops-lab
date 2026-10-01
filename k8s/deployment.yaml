@@ -1,0 +1,25 @@
+# Lab A — a plain Deployment, with NO health checks.
+# Replace YOURNAME with your Docker Hub username.
+#
+# Kubernetes will keep the pod RUNNING, but it has no idea whether the app inside
+# is actually working. Lab D fixes that.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: vvd89/devsecops-lab:v1
+          ports:
+            - containerPort: 3000

@@ -1,0 +1,41 @@
+# Runs Prometheus and Grafana next to the lab app, on your own machine.
+#
+# NOT part of the 4-hour session - this stack is too heavy to run beside minikube in a
+# Codespace. Use it at home, on a laptop, for the homework or just to see it work.
+#
+#   docker compose -f monitoring/docker-compose.monitoring.yml up
+#   app         http://localhost:3000
+#   Prometheus  http://localhost:9090
+#   Grafana     http://localhost:3001   (admin / admin)
+#
+# The dashboard and the Prometheus data source are provisioned automatically, so there is
+# nothing to click before you see data.
+
+services:
+  app:
+    build:
+      context: ../app
+      dockerfile: Dockerfile.hardened
+    ports:
+      - "3000:3000"
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus-local.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true" # read-only without logging in, like play.grafana.org
+    volumes:
+      - ./provisioning:/etc/grafana/provisioning:ro
+      - ./grafana-dashboard.json:/var/lib/grafana/dashboards/unit4.json:ro

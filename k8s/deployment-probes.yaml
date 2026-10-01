@@ -1,0 +1,58 @@
+# Lab D — the same Deployment, but now Kubernetes can tell whether the app is well.
+# Replace YOURNAME with your Docker Hub username.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: YOURNAME/devsecops-lab:v1
+          ports:
+            - containerPort: 3000
+
+          # LIVENESS: "is this container still alive?"
+          # If /health fails 3 times in a row, Kubernetes RESTARTS the container.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5    # give the app time to boot before judging it
+            periodSeconds: 5          # check every 5 seconds
+            failureThreshold: 3       # 3 strikes, then restart
+
+          # READINESS: "should this container receive traffic right now?"
+          # If this fails, the pod is removed from the Service - but NOT restarted.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 2
+            periodSeconds: 3
+
+          # Resource limits. Without these one bad container can starve the whole node,
+          # and Kubernetes has no idea how much room it needs to schedule your pods.
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+
+          # Container hardening, the Kubernetes half of Lab B.3.
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true

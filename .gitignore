@@ -1,0 +1,12 @@
+# Installed dependencies - never commit these. npm install rebuilds them from package.json.
+node_modules/
+
+# Local environment files. This line is why a real .env never reaches GitHub -
+# but note it does NOT protect a secret that is hardcoded in a .js file (see secrets-demo/).
+.env
+.env.*
+
+# Logs and OS noise
+*.log
+npm-debug.log*
+.DS_Store

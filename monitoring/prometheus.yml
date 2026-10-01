@@ -1,0 +1,61 @@
+# Prometheus scrape configuration for the Unit 4 lab app.
+#
+# The whole of Prometheus' data collection is in this file. There is no agent inside your app,
+# nothing is pushed, and Prometheus is not told about metrics in advance. It fetches a text page
+# over HTTP on a timer and stores whatever it finds.
+
+global:
+  scrape_interval: 15s # how often to fetch /metrics from every target
+  evaluation_interval: 15s # how often to re-check the alert rules below
+
+rule_files:
+  - alert-rules.yml
+
+scrape_configs:
+  # ---------------------------------------------------------------------------
+  # Option 1 — a fixed list of targets. Use this with docker-compose or locally.
+  # ---------------------------------------------------------------------------
+  - job_name: "devsecops-lab"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:3000"]
+        labels:
+          env: lab
+
+  # ---------------------------------------------------------------------------
+  # Option 2 — Kubernetes. Prometheus asks the API server what pods exist, so
+  # targets appear and disappear on their own as pods are created and destroyed.
+  # This is why nobody maintains a list of servers any more.
+  # ---------------------------------------------------------------------------
+  - job_name: "kubernetes-pods"
+    kubernetes_sd_configs:
+      - role: pod
+
+    relabel_configs:
+      # Only scrape pods that opt in with: prometheus.io/scrape: "true"
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: "true"
+
+      # Let a pod choose its own port with: prometheus.io/port: "3000"
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+
+      # Carry the pod name through as a label, so dashboards can break metrics down per pod.
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+# To make the lab Deployment scrapeable, add these annotations to the POD template
+# in k8s/deployment.yaml (spec.template.metadata.annotations, not the Deployment's own):
+#
+#   annotations:
+#     prometheus.io/scrape: "true"
+#     prometheus.io/port: "3000"
+#     prometheus.io/path: "/metrics"
