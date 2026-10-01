@@ -1,23 +1,25 @@
-# ⚠️ THIS FILE IS DELIBERATELY INSECURE. It is teaching material for Lab B.
-# Every line marked "PROBLEM" is a real mistake people make. Never ship this.
+# The fixed version of app/Dockerfile. Compare the two side by side in Lab B.3,
+# then scan both with Trivy and compare the CVE counts.
 
-# PROBLEM 1: node:16 reached end-of-life in Sept 2023. It no longer receives security
-#            patches, so the base image ships with dozens of known CVEs.
-FROM node:16-alpine
+# FIX 1: a current, supported base image. This single line removes most of the CVEs.
+FROM node:22-alpine
 
 WORKDIR /app
 
-# PROBLEM 2: copying the whole folder. Whatever happens to be lying around goes into the
-#            image - node_modules from a local install, editor backups, .env files,
-#            and in a real project the .git folder with your entire history.
-COPY . .
+# FIX 2: copy only the dependency files first, install, then copy the source.
+#        Better layer caching, and nothing stray (node_modules, .env, .git) gets copied in.
+COPY package*.json ./
 
-# PROBLEM 3: installs the versions in package.json, which are pinned to old
-#            vulnerable releases (see package.json)
-RUN npm install
+# FIX 3: npm ci installs exactly the versions in the lock file, so the build is reproducible.
+#    --omit=dev leaves build-only packages out of the shipped image.
+#        The fallback is only here because the lab starter ships without a lock file until
+#        you run npm install in Lab B.2 - a real project would always have one committed.
+RUN npm ci --omit=dev || npm install --omit=dev
 
-# PROBLEM 4: no USER instruction, so this container runs as root. If somebody escapes
-#            the app, they are root inside the container.
+COPY app.js index.html ./
+
+# FIX 4: drop root. The node images already provide an unprivileged "node" user.
+USER node
 
 EXPOSE 3000
 CMD ["node", "app.js"]
